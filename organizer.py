@@ -1,12 +1,8 @@
 from pathlib import Path
 import shutil
 import logging
+from recovery import record_move
 
-logging.basicConfig(
-    filename="/mnt/d/smart-file-organizer/logs/organizer.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s"
-)
 
 CATEGORIES = {
     "Documents": [".pdf", ".doc", ".docx", ".txt", ".csv"],
@@ -17,11 +13,20 @@ CATEGORIES = {
 }
 
 
+logging.basicConfig(
+    filename="/mnt/d/smart-file-organizer/logs/organizer.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(message)s"
+)
+
+
 def get_category(extension):
     for category, extensions in CATEGORIES.items():
         if extension in extensions:
             return category
+
     return "Others"
+
 
 def organize_folder(folder_path):
     folder = Path(folder_path)
@@ -35,8 +40,7 @@ def organize_folder(folder_path):
         if not file.is_file():
             continue
 
-        extension = file.suffix.lower()
-        category = get_category(extension)
+        category = get_category(file.suffix.lower())
 
         category_folder = folder / category
         category_folder.mkdir(exist_ok=True)
@@ -44,16 +48,41 @@ def organize_folder(folder_path):
         destination = category_folder / file.name
 
         counter = 1
+
         while destination.exists():
             destination = category_folder / f"{file.stem}_{counter}{file.suffix}"
             counter += 1
 
-        shutil.move(str(file), str(destination))
+        try:
+            shutil.move(str(file), str(destination))
 
-        print(f"Moved: {file.name} -> {category}/")
-        logging.info(f"Moved: {file.name} -> {category}/")
+            # Record the movement for recovery/undo
+            record_move(file, destination)
 
-    print("\nFile organization completed!")
+            logging.info(
+                f"Moved: {file} -> {destination}"
+            )
+
+            print(f"Moved: {file.name} -> {category}/")
+
+        except Exception as error:
+
+            logging.error(
+                f"Failed to move {file}: {error}"
+            )
+
+            print(
+                f"Error moving {file.name}: {error}"
+            )
+
+    print("File organization completed!")
+
+
 if __name__ == "__main__":
+
+    print("Smart File Organizer")
+    print("--------------------")
+
     folder_path = input("Enter folder path: ")
+
     organize_folder(folder_path)
